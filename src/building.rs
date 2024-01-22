@@ -1,5 +1,6 @@
-use bevy::pbr::NotShadowReceiver;
 use bevy::{prelude::*, render::mesh::*};
+use bevy_mod_picking::events::{Click, Pointer};
+use bevy_mod_picking::prelude::On;
 use geo::algorithm::TriangulateEarcut;
 use geo_types::Polygon;
 use serde::{Deserialize, Serialize};
@@ -54,9 +55,10 @@ impl FromStr for BuildingClass {
     }
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone)]
 pub struct Building {
     pub class: Option<BuildingClass>,
+    pub names: Option<Names>,
     pub translate: [f64; 2],
     pub height: Option<f64>,
     pub num_floors: Option<i32>,
@@ -67,9 +69,14 @@ pub struct Building {
 }
 
 impl Building {
-    pub fn from_props(props: BuildingGeometryProps, class: Option<BuildingClass>) -> Self {
+    pub fn from_props(
+        props: BuildingGeometryProps,
+        class: Option<BuildingClass>,
+        names: Option<Names>,
+    ) -> Self {
         Building {
             class,
+            names,
             translate: props.translate,
             height: props.height,
             num_floors: props.num_floors,
@@ -80,6 +87,36 @@ impl Building {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Names {
+    pub common: Vec<Name>,
+    pub official: Option<Vec<Name>>,
+    pub alternate: Option<Vec<Name>>,
+    pub short: Option<Vec<Name>>,
+}
+
+impl Names {
+    pub fn common_local(&self) -> Option<&str> {
+        self.common
+            .iter()
+            .find(|n| n.is_local())
+            .map(|n| n.value.as_str())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Name {
+    pub value: String,
+    pub language: String,
+}
+
+impl Name {
+    pub fn is_local(&self) -> bool {
+        self.language == "local"
+    }
+}
+
 #[derive(Debug)]
 pub struct BuildingGeometryProps {
     pub translate: [f64; 2],
@@ -271,12 +308,15 @@ pub fn spawn_building(
         Some(c) => map_materials.walls.get(c).unwrap().clone(),
         None => map_materials.unknown_building.clone(),
     };
-    cmd.spawn((PbrBundle {
-        mesh: meshes.add(mesh),
-        material: handle.clone(),
-        transform,
-        ..Default::default()
-    },));
+    cmd.spawn((
+        PbrBundle {
+            mesh: meshes.add(mesh),
+            material: handle.clone(),
+            transform,
+            ..Default::default()
+        },
+        building.clone(),
+    ));
 
     // ROOF
     let mut roof = Mesh::new(PrimitiveTopology::TriangleList);
@@ -318,7 +358,7 @@ pub fn spawn_building(
             transform,
             ..Default::default()
         },
-        NotShadowReceiver,
+        building.clone(),
     ));
 }
 
@@ -343,6 +383,7 @@ impl Wall {
             uvs: vec![],
         }
     }
+
     pub fn new(line: &Vec<[f64; 2]>, height: f32) -> Self {
         let mut wall = Wall::empty();
         wall.points = line

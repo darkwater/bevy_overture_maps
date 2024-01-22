@@ -8,6 +8,7 @@ use geozero::wkb::WkbDialect;
 use crate::building::{polygon_building, Building};
 use crate::BuildingClass;
 use crate::KxyGeodesic;
+use crate::Names;
 
 // https://github.com/OvertureMaps/data/issues/8 duckdb issue
 // https://bertt.wordpress.com/2023/07/31/overture-maps/
@@ -46,8 +47,8 @@ pub fn query_buildings(params: BuildingsQueryParams) -> Vec<Building> {
     struct DbBuilding {
         id: String,
         height: Option<f64>,
-        // names: String,
-        // bbox: String,
+        names: Option<String>,
+        bbox: Vec<u8>,
         geom: Vec<u8>,
         num_floors: Option<i32>,
         class: Option<String>,
@@ -57,8 +58,8 @@ pub fn query_buildings(params: BuildingsQueryParams) -> Vec<Building> {
             Ok(DbBuilding {
                 id: row.get(0)?,
                 height: row.get(1)?,
-                // names: row.get(2)?,
-                // bbox: row.get(3)?,
+                names: row.get(2)?,
+                bbox: row.get(3)?,
                 geom: row.get(3)?,
                 num_floors: row.get(4)?,
                 class: row.get(5)?,
@@ -76,6 +77,9 @@ pub fn query_buildings(params: BuildingsQueryParams) -> Vec<Building> {
         let g = Geometry::from_wkb(&mut rdr, WkbDialect::Wkb);
 
         let building_class = query_item.class.map(|c| c.parse().unwrap_or_default());
+        let names =
+            dbg!(query_item.names).and_then(|n| serde_json::from_str(&n).map_err(|e| dbg!(e)).ok());
+
         match g {
             Ok(g) => match g {
                 Geometry::MultiPolygon(multy_polygon) => {
@@ -83,8 +87,9 @@ pub fn query_buildings(params: BuildingsQueryParams) -> Vec<Building> {
                         let exterior = polygon.exterior();
                         let c1 = exterior
                             .coords()
-                            .nth(0)
+                            .next()
                             .expect("To take exterior:0 coordinate");
+
                         for (i, c) in exterior.coords().enumerate() {
                             if i > 0 {
                                 let dlat = c.x - c1.x;
@@ -106,15 +111,18 @@ pub fn query_buildings(params: BuildingsQueryParams) -> Vec<Building> {
                             query_item.num_floors,
                         );
 
-                        let building = Building::from_props(building, building_class);
-                        buildings.push(building);
+                        buildings.push(Building::from_props(
+                            building,
+                            building_class,
+                            names.clone(),
+                        ));
                     }
                 }
                 Geometry::Polygon(polygon) => {
                     let exterior = polygon.exterior();
                     let c1 = exterior
                         .coords()
-                        .nth(0)
+                        .next()
                         .expect("To take exterior:0 coordinate");
                     for (i, c) in exterior.coords().enumerate() {
                         if i > 0 {
@@ -136,8 +144,8 @@ pub fn query_buildings(params: BuildingsQueryParams) -> Vec<Building> {
                         query_item.height,
                         query_item.num_floors,
                     );
-                    let building = Building::from_props(building, building_class);
-                    buildings.push(building);
+
+                    buildings.push(Building::from_props(building, building_class, names));
                 }
                 not_polygon => {
                     dbg!(&not_polygon);

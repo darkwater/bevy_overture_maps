@@ -11,8 +11,10 @@ arrow = { version = "49.0.0", features = [
     "json",
 ] }
 bevy = { version = "0.12", features = ["jpeg"] }
-bevy_panorbit_camera = "0.10.0"
-bevy_mod_picking = "0.17.0"
+bevy_egui = "0.24.0"
+bevy-inspector-egui = "0.22.1"
+bevy_panorbit_camera = { version = "0.10.0", features = ["bevy_egui"] }
+bevy_mod_picking = { version = "0.17.0", default-features = false, features = ["highlight", "selection", "backend_egui", "backend_raycast"] }
 clap = { version = "4.3", features = ["derive"] }
 duckdb = { version = "0.9.2", features = ["bundled", "parquet"] }
 dotenv = "0.15.0"

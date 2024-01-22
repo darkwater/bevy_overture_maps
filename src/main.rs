@@ -1,4 +1,6 @@
+use bevy::reflect::Map;
 use bevy::{pbr::DirectionalLightShadowMap, prelude::*, window::WindowResolution};
+use bevy_egui::egui::{self, Area, FontData, FontDefinitions, FontFamily};
 
 mod building;
 mod camera;
@@ -12,6 +14,10 @@ mod query_buildings;
 mod query_transportation;
 mod transportation;
 
+use bevy_egui::{EguiContexts, EguiPlugin};
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_mod_picking::pointer::{PointerId, PointerLocation};
+use bevy_mod_picking::{focus::HoverMap, DefaultPickingPlugins};
 pub use building::*;
 pub use geo_util::*;
 pub use material::*;
@@ -74,12 +80,15 @@ fn main() {
                     resolution: WindowResolution::new(1920., 1080.),
                     #[cfg(target_arch = "wasm32")]
                     resolution: WindowResolution::new(720., 360.),
-                    canvas: Some("#bevy-overture-maps".to_string()),
+                    canvas: Some("#darkmap".to_string()),
                     ..default()
                 }),
                 ..default()
             }),
             PlayerCameraPlugin,
+            DefaultPickingPlugins,
+            EguiPlugin,
+            WorldInspectorPlugin::new(),
             #[cfg(feature = "fps")]
             crate::dash::DashPlugin,
         ))
@@ -100,8 +109,62 @@ fn main() {
                 light_start_system,
                 buildings_start,
                 transportations_start,
+                install_font,
             ),
         )
-        .add_systems(Update, animate_light_direction)
+        .add_systems(Update, (animate_light_direction, draw_hover_text))
         .run();
+}
+
+fn install_font(mut egui: EguiContexts) {
+    let mut fonts = FontDefinitions::default();
+
+    fonts.font_data.insert(
+        "noto-sans-jp".to_owned(),
+        FontData::from_static(include_bytes!("../assets/fonts/NotoSansJP-Regular.ttf")),
+    );
+
+    fonts
+        .families
+        .get_mut(&FontFamily::Proportional)
+        .unwrap()
+        .push("noto-sans-jp".to_owned());
+
+    egui.ctx_mut().set_fonts(fonts);
+}
+
+fn draw_hover_text(
+    mut egui: EguiContexts,
+    hovers: Res<HoverMap>,
+    pointers: Query<(&PointerId, &PointerLocation)>,
+    buildings: Query<&Building>,
+) {
+    let ctx = egui.ctx_mut();
+
+    let building = hovers
+        .get(&PointerId::Mouse)
+        .and_then(|hits| hits.iter().find_map(|(ent, _)| buildings.get(*ent).ok()));
+
+    let pointer = pointers
+        .iter()
+        .find(|(id, _)| id.is_mouse())
+        .and_then(|(_, loc)| loc.location.as_ref());
+
+    if let (Some(building), Some(pointer)) = (building, pointer) {
+        if let Some(text) = building
+            .names
+            .as_ref()
+            .and_then(|n| n.common_local().map(|c| c.to_string()))
+            .or_else(|| building.class.map(|c| format!("{c:?}")))
+        {
+            egui::show_tooltip_at(
+                ctx,
+                "hover text".into(),
+                Some(egui::Pos2::from(pointer.position.to_array()) + egui::vec2(4., 24.)),
+                |ui| {
+                    ui.label(text);
+                },
+            );
+        }
+    }
 }
