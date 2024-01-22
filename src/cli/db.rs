@@ -20,7 +20,7 @@ pub fn cache_location(lon: f64, lat: f64, name: &str) {
     let lonlatname = format!("{lon}_{lat}_{name}");
 
     let from_segment =
-        "read_parquet('../overture/theme=transportation/type=segment/*')".to_string();
+        "read_parquet('/mnt/overture/theme=transportation/type=segment/*')".to_string();
     let mut stmt = conn
         .prepare(&format!(
             "COPY (SELECT * FROM {from_segment} WHERE {where_str})
@@ -29,7 +29,7 @@ pub fn cache_location(lon: f64, lat: f64, name: &str) {
         .unwrap();
     let _ = stmt.query([]).unwrap();
 
-    let from_building = "read_parquet('../overture/theme=buildings/type=building/*')".to_string();
+    let from_building = "read_parquet('/mnt/overture/theme=buildings/type=building/*')".to_string();
     let mut stmt = conn
         .prepare(&format!(
             "COPY (SELECT * FROM {from_building} WHERE {where_str})

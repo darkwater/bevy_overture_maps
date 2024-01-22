@@ -1,50 +1,41 @@
+use bevy::pbr::NotShadowReceiver;
 use bevy::{prelude::*, render::mesh::*};
 use geo::algorithm::TriangulateEarcut;
 use geo_types::Polygon;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::FRAC_PI_2;
 use std::ops::Sub;
+use std::str::FromStr;
 use strum_macros::EnumIter;
 
 use crate::material::MapMaterialHandle;
 use crate::KxyGeodesic;
 
 // https://docs.overturemaps.org/reference/buildings/building
-// ["residential","outbuilding","agricultural","commercial","industrial","education","service","religious","civic","transportation","medical","entertainment","military"]
-
-#[derive(EnumIter, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Default, EnumIter, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum BuildingClass {
-    // #[serde(rename = "residential")]
+    #[default]
     Residential,
-    // #[serde(rename = "outbuilding")]
     Outbuilding,
-    // #[serde(rename = "agricultural")]
     Agricultural,
-    // #[serde(rename = "commercial")]
     Commercial,
-    // #[serde(rename = "industrial")]
     Industrial,
-    // #[serde(rename = "education")]
     Education,
-    // #[serde(rename = "service")]
     Service,
-    // #[serde(rename = "religious")]
     Religious,
-    // #[serde(rename = "civic")]
     Civic,
-    // #[serde(rename = "transportation")]
     Transportation,
-    // #[serde(rename = "medical")]
     Medical,
-    // #[serde(rename = "entertainment")]
     Entertainment,
-    // #[serde(rename = "military")]
     Military,
 }
-impl BuildingClass {
-    pub fn from_string(s: &String) -> BuildingClass {
-        match s.as_str() {
+
+impl FromStr for BuildingClass {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<BuildingClass, ()> {
+        Ok(match s {
             "residential" => BuildingClass::Residential,
             "outbuilding" => BuildingClass::Outbuilding,
             "agricultural" => BuildingClass::Agricultural,
@@ -58,8 +49,8 @@ impl BuildingClass {
             "medical" => BuildingClass::Medical,
             "entertainment" => BuildingClass::Entertainment,
             "military" => BuildingClass::Military,
-            _ => BuildingClass::Residential,
-        }
+            _ => return Err(()),
+        })
     }
 }
 
@@ -133,7 +124,7 @@ pub fn polygon_building(
     let exterior = polygon.exterior();
     let c1 = exterior
         .coords()
-        .nth(0)
+        .next()
         .expect("To take exterior:0 coordinate");
 
     let translate: [f64; 2] = [c1.x * k[0] - center[0], -c1.y * k[1] - center[1]]; // Yto-Z
@@ -320,12 +311,15 @@ pub fn spawn_building(
         Some(c) => map_materials.roofs.get(c).unwrap().clone(),
         None => map_materials.unknown_building_roof.clone(),
     };
-    cmd.spawn((PbrBundle {
-        mesh: meshes.add(roof),
-        material: handle,
-        transform,
-        ..Default::default()
-    },));
+    cmd.spawn((
+        PbrBundle {
+            mesh: meshes.add(roof),
+            material: handle,
+            transform,
+            ..Default::default()
+        },
+        NotShadowReceiver,
+    ));
 }
 
 #[derive(Component, Debug)]

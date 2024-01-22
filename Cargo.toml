@@ -1,43 +1,39 @@
 [package]
-name = "bevy_overture_maps"
-version = "0.3.2"
+name = "darkmap"
+version = "0.1.0"
 edition = "2021"
 
-[profile.release]
-codegen-units = 1
-
-[workspace]
-resolver = "2"
-members = ["app", "cli"]
-
-[workspace.dependencies]
-arrow = { version = "44.0.0", features = [
+[dependencies]
+arrow = { version = "49.0.0", features = [
     "ipc",
     "test_utils",
     "prettyprint",
     "json",
 ] }
-bevy = { version = "0.11", features = ["jpeg"] }
-duckdb = { git = "https://github.com/duckdb/duckdb-rs", features = [
-] } # arrow 44
-# geo = { version = "0.26.0", features = [] }
-geo = { git = "https://github.com/georust/geo" }          # Vector2DOps
+bevy = { version = "0.12", features = ["jpeg"] }
+bevy_panorbit_camera = "0.10.0"
+bevy_mod_picking = "0.17.0"
+clap = { version = "4.3", features = ["derive"] }
+duckdb = { version = "0.9.2", features = ["bundled", "parquet"] }
+dotenv = "0.15.0"
+geo = { version = "0.27.0", features = [] }
+# geo = { git = "https://github.com/georust/geo" }          # Vector2DOps
 geozero = { version = "0.10.0", features = ["with-wkb"] }
 geo-types = { version = "0.7.11" }
-parquet = "44.0.0"
+parquet = "49.0.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde_yaml = "0.9.25"
 tokio = { version = "1.28" }
-
-[dependencies]
-arrow = { workspace = true }
-bevy = { workspace = true }
-duckdb = { workspace = true }
-geo = { workspace = true }
-geozero = { workspace = true }
-geo-types = { workspace = true }
-parquet = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
 strum = "0.25.0"
 strum_macros = "0.25.2"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+overflow-checks = false
+
+[profile.release]
+codegen-units = 1

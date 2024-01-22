@@ -3,6 +3,7 @@ use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::render::camera::Projection;
 use bevy::window::CursorGrabMode;
+use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 
 use crate::config::SceneConfig;
 
@@ -31,10 +32,12 @@ pub struct PlayerCameraPlugin;
 
 impl Plugin for PlayerCameraPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(CameraConfig::default())
+        app.add_plugins(PanOrbitCameraPlugin)
+            .insert_resource(CameraConfig::default())
             .add_systems(PostStartup, camera_start_system)
-            .add_systems(Update, (grab_mouse, camera_switch_system))
-            .add_systems(PreUpdate, camera_controller_system);
+            // .add_systems(Update, (grab_mouse, camera_switch_system))
+            .add_systems(PreUpdate, camera_controller_system)
+            .add_systems(PostUpdate, fix_y_pos);
     }
 }
 
@@ -55,7 +58,7 @@ pub fn camera_start_system(mut cmd: Commands, scene_config: Res<SceneConfig>) {
                 near: 0.1,
                 ..default()
             }),
-            #[cfg(any(target_os = "ios"))]
+            #[cfg(target_os = "ios")]
             dither: bevy::core_pipeline::tonemapping::DebandDither::Disabled,
             tonemapping: Tonemapping::TonyMcMapface,
             ..default()
@@ -70,8 +73,20 @@ pub fn camera_start_system(mut cmd: Commands, scene_config: Res<SceneConfig>) {
                 Color::rgb(0.8, 0.844, 1.0),
             ),
         },
-        CameraController::default(),
+        // CameraController::default(),
+        PanOrbitCamera {
+            button_pan: MouseButton::Left,
+            button_orbit: MouseButton::Right,
+            ..default()
+        },
     ));
+}
+
+pub fn fix_y_pos(mut q: Query<&mut PanOrbitCamera>) {
+    for mut camera in q.iter_mut() {
+        camera.target_focus.y = 0.;
+        camera.focus.y = 0.;
+    }
 }
 
 #[derive(Component)]

@@ -1,7 +1,4 @@
-use bevy::{
-    pbr::{CascadeShadowConfigBuilder, NotShadowCaster},
-    prelude::*,
-};
+use bevy::{pbr::NotShadowCaster, prelude::*};
 
 use crate::config::SceneConfig;
 
@@ -17,24 +14,24 @@ pub fn light_start_system(
     });
 
     cmd.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
-            illuminance: 40_000.,
-            shadows_enabled: true,
-            ..default()
-        },
+        // directional_light: DirectionalLight {
+        //     illuminance: 40_000.,
+        //     shadows_enabled: true,
+        //     ..default()
+        // },
         transform: Transform {
             translation: Vec3::new(0., 0., 0.),
             rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_8),
             ..default()
         },
-        cascade_shadow_config: CascadeShadowConfigBuilder {
-            maximum_distance: 2500.,
-            minimum_distance: 0.2,
-            num_cascades: 3,
-            first_cascade_far_bound: 200.,
-            ..default()
-        }
-        .into(),
+        // cascade_shadow_config: CascadeShadowConfigBuilder {
+        //     maximum_distance: 2500.,
+        //     minimum_distance: 0.2,
+        //     num_cascades: 3,
+        //     first_cascade_far_bound: 200.,
+        //     ..default()
+        // }
+        // .into(),
         ..default()
     });
 

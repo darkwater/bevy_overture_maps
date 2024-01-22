@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use duckdb::Connection;
 use geo_types::Geometry;
 use geozero::wkb::FromWkb;
@@ -73,7 +75,7 @@ pub fn query_buildings(params: BuildingsQueryParams) -> Vec<Building> {
         let mut rdr = std::io::Cursor::new(raw);
         let g = Geometry::from_wkb(&mut rdr, WkbDialect::Wkb);
 
-        let building_class = query_item.class.map(|c| BuildingClass::from_string(&c));
+        let building_class = query_item.class.map(|c| c.parse().unwrap_or_default());
         match g {
             Ok(g) => match g {
                 Geometry::MultiPolygon(multy_polygon) => {
