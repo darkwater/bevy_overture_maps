@@ -36,6 +36,7 @@ pub fn query_transportation(params: TransportationQueryParams) -> Vec<Segment> {
                 geometry,
                 road,
                 level
+                -- width
                 FROM {from} {limit}"
         ))
         .unwrap();
@@ -46,6 +47,7 @@ pub fn query_transportation(params: TransportationQueryParams) -> Vec<Segment> {
         road: Option<String>,
         // level: Option<u32>,
         // connectors: Option<String>,
+        // width: Option<f32>,
     }
 
     let now = std::time::Instant::now();
@@ -56,7 +58,7 @@ pub fn query_transportation(params: TransportationQueryParams) -> Vec<Segment> {
                 geom: row.get(1)?,
                 road: row.get(2)?,
                 // level: row.get(3)?,
-                // connectors: row.get(2)?,
+                // width: row.get(4)?,
             })
         })
         .unwrap();
@@ -82,6 +84,7 @@ pub fn query_transportation(params: TransportationQueryParams) -> Vec<Segment> {
                             line,
                             k: params.k,
                             road_class,
+                            width: None, //item.width,
                         };
                         segments.push(segment);
                     }

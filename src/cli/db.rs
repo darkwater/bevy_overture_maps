@@ -9,7 +9,7 @@ pub fn cache_location(lon: f64, lat: f64, name: &str) {
 
     // let polygon_str = format!("{lon_min} {lat_min}, {lon_min} {lat_max}, {lon_max} {lat_max}, {lon_max} {lat_min}, {lon_min} {lat_min}", );
     // let where_str = format!("ST_Within(ST_GeomFromWkb(geometry), ST_Envelope(ST_GeomFromText('POLYGON(({polygon_str}))')))");
-    let where_str = format!("bbox.minX > {lon_min} AND bbox.minY > {lat_min} AND bbox.maxX < {lon_max} AND bbox.maxY < {lat_max}");
+    let where_str = format!("bbox.maxX > {lon_min} AND bbox.maxY > {lat_min} AND bbox.minX < {lon_max} AND bbox.minY < {lat_max}");
 
     let path = "./data.duckdb";
     let conn = Connection::open(&path).unwrap();

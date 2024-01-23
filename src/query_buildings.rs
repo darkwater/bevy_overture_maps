@@ -77,8 +77,7 @@ pub fn query_buildings(params: BuildingsQueryParams) -> Vec<Building> {
         let g = Geometry::from_wkb(&mut rdr, WkbDialect::Wkb);
 
         let building_class = query_item.class.map(|c| c.parse().unwrap_or_default());
-        let names =
-            dbg!(query_item.names).and_then(|n| serde_json::from_str(&n).map_err(|e| dbg!(e)).ok());
+        let names = query_item.names.and_then(|n| serde_json::from_str(&n).ok());
 
         match g {
             Ok(g) => match g {

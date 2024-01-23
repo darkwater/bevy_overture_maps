@@ -1,7 +1,7 @@
 use bevy::{pbr::NotShadowCaster, prelude::*, render::mesh::*};
 use geo_types::LineString;
 use serde::{Deserialize, Serialize};
-use std::f32::consts::FRAC_PI_2;
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_3, FRAC_PI_6, PI};
 use std::ops::Sub;
 use strum_macros::EnumIter;
 
@@ -84,6 +84,7 @@ pub struct Segment {
     pub line: Vec<[f64; 2]>,
     pub k: KxyGeodesic,
     pub road_class: RoadClass,
+    pub width: Option<f32>,
 }
 
 #[derive(Resource, Debug)]
@@ -198,26 +199,29 @@ pub fn spawn_transportation(
     transportation: &Segment,
     map_materials: &Res<MapMaterialHandle>,
 ) {
-    let width = RoadWidth::from(&transportation.road_class);
+    let width = transportation
+        .width
+        .unwrap_or_else(|| RoadWidth::from(&transportation.road_class));
+
     let segment = RoadSegment::new(&transportation.line, width);
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
     mesh.insert_attribute(
         Mesh::ATTRIBUTE_POSITION,
-        VertexAttributeValues::from(segment.vertices),
+        VertexAttributeValues::from(segment.vertices.clone()),
     );
     mesh.insert_attribute(
         Mesh::ATTRIBUTE_NORMAL,
-        VertexAttributeValues::from(segment.normals),
+        VertexAttributeValues::from(segment.normals.clone()),
     );
     mesh.insert_attribute(
         Mesh::ATTRIBUTE_UV_0,
-        VertexAttributeValues::from(segment.uvs),
+        VertexAttributeValues::from(segment.uvs.clone()),
     );
-    mesh.set_indices(Some(Indices::U32(segment.indices)));
+    mesh.set_indices(Some(Indices::U32(segment.indices.clone())));
 
     let translate: Vec3 = Vec3::new(
         transportation.translate[0] as f32,
-        0.01,
+        width * 0.01,
         transportation.translate[1] as f32,
     );
     let transform = Transform::from_translation(translate);
@@ -232,6 +236,7 @@ pub fn spawn_transportation(
             transform,
             ..Default::default()
         },
+        segment,
         NotShadowCaster,
     ));
 }
@@ -257,56 +262,139 @@ impl RoadSegment {
             uvs: vec![],
         }
     }
-    pub fn new(line: &Vec<[f64; 2]>, width: f32) -> Self {
+
+    pub fn new(line: &[[f64; 2]], width: f32) -> Self {
         let half_width: f32 = width / 2.;
         let mut segm = Self::empty();
         segm.points = line
             .iter()
             .map(|pos| Vec3::new(pos[0] as f32, 0., pos[1] as f32))
             .collect::<Vec<Vec3>>();
-        let material_length = 1.;
-        let mut len: f32 = 0.;
 
-        for (i, p) in segm.points.iter().enumerate() {
-            let last: bool = i + 1 == segm.points.len();
-            if last {
-            } else {
-                let ix2: u32 = i as u32 * 4;
-                let (tri_1, tri_2) = ([ix2, ix2 + 1, ix2 + 2], [ix2 + 2, ix2 + 1, ix2 + 3]);
-                segm.indices.extend(tri_1);
-                segm.indices.extend(tri_2);
-                segm.norm.push(Vec3::Y);
+        let first_angle = segm.points[1].sub(segm.points[0]).normalize();
+        let first_left = Quat::from_rotation_y(FRAC_PI_2).mul_vec3(first_angle);
+        let first_right = Quat::from_rotation_y(-FRAC_PI_2).mul_vec3(first_angle);
+        let first_left_behind = Quat::from_rotation_y(FRAC_PI_2 + FRAC_PI_3).mul_vec3(first_angle);
+        let first_right_behind =
+            Quat::from_rotation_y(-FRAC_PI_2 - FRAC_PI_3).mul_vec3(first_angle);
 
-                let i_next: usize = i + 1;
-                let point: Vec3 = *p;
-                let point_next: Vec3 = segm.points[i_next];
+        segm.vertices
+            .push((segm.points[0] + first_left_behind * half_width).into());
+        segm.vertices
+            .push((segm.points[0] + first_right_behind * half_width).into());
+        segm.vertices
+            .push((segm.points[0] + first_left * half_width).into());
+        segm.vertices
+            .push((segm.points[0] + first_right * half_width).into());
 
-                let dir: Vec3 = (point_next - point).normalize();
-                let left_norm = Quat::from_rotation_y(FRAC_PI_2).mul_vec3(dir);
-                let side = left_norm * half_width;
-                let (l1, r1) = (point + side, point - side);
-                let (l2, r2) = (point_next + side, point_next - side);
-                segm.vertices.push((l1).into());
-                segm.vertices.push((r1).into());
-                segm.vertices.push((l2).into());
-                segm.vertices.push((r2).into());
+        segm.normals.push(Vec3::Y.into());
+        segm.normals.push(Vec3::Y.into());
+        segm.normals.push(Vec3::Y.into());
+        segm.normals.push(Vec3::Y.into());
 
-                let l_uv = len / material_length;
-                segm.uvs.push([l_uv, 0.]);
-                segm.uvs.push([l_uv, 0.]);
-                segm.uvs.push([l_uv, 1.]);
-                segm.uvs.push([l_uv, 1.]);
+        segm.uvs.push([0., 0.]);
+        segm.uvs.push([0., 1.]);
+        segm.uvs.push([0.1, 0.]);
+        segm.uvs.push([0.1, 1.]);
 
-                let normal = segm.norm[i].to_array();
-                segm.normals.push(normal);
-                segm.normals.push(normal);
-                segm.normals.push(normal);
-                segm.normals.push(normal);
+        for [prev, this, next] in segm.points.array_windows().copied() {
+            let prev_angle = this.sub(prev).normalize();
+            let next_angle = next.sub(this).normalize();
+            let angle = (prev_angle + next_angle).normalize();
 
-                let diff = point_next.sub(point).length();
-                len += diff;
-            }
+            let left = Quat::from_rotation_y(FRAC_PI_2).mul_vec3(angle);
+            let right = Quat::from_rotation_y(-FRAC_PI_2).mul_vec3(angle);
+
+            segm.vertices.push((this + left * half_width).into());
+            segm.vertices.push((this + right * half_width).into());
+
+            segm.normals.push(Vec3::Y.into());
+            segm.normals.push(Vec3::Y.into());
+
+            segm.uvs.push([0.5, 0.]);
+            segm.uvs.push([0.5, 1.]);
         }
+
+        let last_angle = segm.points[segm.points.len() - 1]
+            .sub(segm.points[segm.points.len() - 2])
+            .normalize();
+        let last_left = Quat::from_rotation_y(FRAC_PI_2).mul_vec3(last_angle);
+        let last_right = Quat::from_rotation_y(-FRAC_PI_2).mul_vec3(last_angle);
+        let last_left_after = Quat::from_rotation_y(FRAC_PI_2 - FRAC_PI_3).mul_vec3(last_angle);
+        let last_right_after = Quat::from_rotation_y(-FRAC_PI_2 + FRAC_PI_3).mul_vec3(last_angle);
+
+        segm.vertices
+            .push((segm.points[segm.points.len() - 1] + last_left * half_width).into());
+        segm.vertices
+            .push((segm.points[segm.points.len() - 1] + last_right * half_width).into());
+        segm.vertices
+            .push((segm.points[segm.points.len() - 1] + last_left_after * half_width).into());
+        segm.vertices
+            .push((segm.points[segm.points.len() - 1] + last_right_after * half_width).into());
+
+        segm.normals.push(Vec3::Y.into());
+        segm.normals.push(Vec3::Y.into());
+        segm.normals.push(Vec3::Y.into());
+        segm.normals.push(Vec3::Y.into());
+
+        segm.uvs.push([0.9, 0.]);
+        segm.uvs.push([0.9, 1.]);
+        segm.uvs.push([1., 0.]);
+        segm.uvs.push([1., 1.]);
+
+        // segm.indices.extend([0, 1, 2]);
+        // segm.indices.extend([2, 1, 3]);
+
+        for n in (0..segm.vertices.len() - 2).step_by(2) {
+            segm.indices.extend([n as u32, n as u32 + 1, n as u32 + 2]);
+            segm.indices
+                .extend([n as u32 + 2, n as u32 + 1, n as u32 + 3]);
+        }
+
+        // let material_length = 1.;
+        // let mut len: f32 = 0.;
+
+        // for (i, p) in segm.points.iter().enumerate() {
+        //     let last: bool = i + 1 == segm.points.len();
+        //     if last {
+        //     } else {
+        //         let ix2: u32 = i as u32 * 4;
+        //         let (tri_1, tri_2) = ([ix2, ix2 + 1, ix2 + 2], [ix2 + 2, ix2 + 1, ix2 + 3]);
+        //         segm.indices.extend(tri_1);
+        //         segm.indices.extend(tri_2);
+        //         segm.norm.push(Vec3::Y);
+
+        //         let i_next: usize = i + 1;
+        //         let point: Vec3 = *p;
+        //         let point_next: Vec3 = segm.points[i_next];
+
+        //         let dir: Vec3 = (point_next - point).normalize();
+        //         let left_norm = Quat::from_rotation_y(FRAC_PI_2).mul_vec3(dir);
+        //         let side = left_norm * half_width;
+        //         let (l1, r1) = (point + side, point - side);
+        //         let (l2, r2) = (point_next + side, point_next - side);
+        //         segm.vertices.push((l1).into());
+        //         segm.vertices.push((r1).into());
+        //         segm.vertices.push((l2).into());
+        //         segm.vertices.push((r2).into());
+
+        //         let l_uv = len / material_length;
+        //         segm.uvs.push([l_uv, 0.]);
+        //         segm.uvs.push([l_uv, 0.]);
+        //         segm.uvs.push([l_uv, 1.]);
+        //         segm.uvs.push([l_uv, 1.]);
+
+        //         let normal = segm.norm[i].to_array();
+        //         segm.normals.push(normal);
+        //         segm.normals.push(normal);
+        //         segm.normals.push(normal);
+        //         segm.normals.push(normal);
+
+        //         let diff = point_next.sub(point).length();
+        //         len += diff;
+        //     }
+        // }
+
         segm
     }
 }

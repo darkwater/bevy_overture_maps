@@ -2,6 +2,15 @@
 name = "darkmap"
 version = "0.1.0"
 edition = "2021"
+default-run = "darkmap"
+
+[[bin]]
+name = "darkmap"
+path = "src/main.rs"
+
+[[bin]]
+name = "cli"
+path = "src/cli/main.rs"
 
 [dependencies]
 arrow = { version = "49.0.0", features = [
@@ -26,7 +35,7 @@ parquet = "49.0.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9.25"
-tokio = { version = "1.28" }
+tokio = { version = "1.28", features = ["rt-multi-thread", "macros"] }
 strum = "0.25.0"
 strum_macros = "0.25.2"
 
@@ -39,3 +48,4 @@ overflow-checks = false
 
 [profile.release]
 codegen-units = 1
+lto = "fat"

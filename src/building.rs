@@ -344,6 +344,7 @@ pub fn spawn_building(
     let bs = building.triangle_indices.clone();
     roof.set_indices(Some(Indices::U32(bs)));
 
+    // let height = 0.5;
     let translation = transform.translation + Vec3::new(0., height, 0.);
     let transform: Transform = Transform::from_translation(translation);
 

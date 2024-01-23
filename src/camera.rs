@@ -1,4 +1,6 @@
-use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::core_pipeline::fxaa::Fxaa;
+use bevy::core_pipeline::prepass::{DeferredPrepass, MotionVectorPrepass};
+use bevy::core_pipeline::{prepass::DepthPrepass, tonemapping::Tonemapping};
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::render::camera::Projection;
@@ -79,6 +81,10 @@ pub fn camera_start_system(mut cmd: Commands, scene_config: Res<SceneConfig>) {
             button_orbit: MouseButton::Right,
             ..default()
         },
+        DepthPrepass,
+        MotionVectorPrepass,
+        DeferredPrepass,
+        Fxaa::default(),
     ));
 }
 
